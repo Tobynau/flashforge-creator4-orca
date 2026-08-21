@@ -218,7 +218,7 @@
         "5"
     ],
     "machine_pause_gcode": "M25",
-    "machine_start_gcode": ";start gcode\n;machine_type: Creator 4\nM140 S{bed_temperature_initial_layer_single} T0\n{if is_extruder_used[0]}M104 S{nozzle_temperature_initial_layer[0]} T0{else}M104 S0 T0{endif}\n{if is_extruder_used[1]}M104 S{nozzle_temperature_initial_layer[1]} T1{else}M104 S0 T1{endif}\nM654 P60\nM653 S0\nM656 S0\nM107 T0\nM107 T1\nM204 S1000\nM900 K0.000 T0\nM900 K0.000 T1\nG90\nG1 Z50.000 F420\nM7 T0\n{if is_extruder_used[0]}M6 T0{endif}\n{if is_extruder_used[1]}M6 T1{endif}\n{if filament_type[initial_extruder]==\"PLA\" or filament_type[initial_extruder]==\"PETG\" or filament_type[initial_extruder]==\"PVA\"}M651 S255{else}M652{endif}\nM108 T{initial_extruder}\n;layer_count:{total_layer_count}",
+    "machine_start_gcode": ";start gcode\n;machine_type: Creator 4\nM140 S{bed_temperature_initial_layer_single} T0\n{if is_extruder_used[0]}M104 S{nozzle_temperature_initial_layer[0]} T0{else}M104 S0 T0{endif}\n{if is_extruder_used[1]}M104 S{nozzle_temperature_initial_layer[1]} T1{else}M104 S0 T1{endif}\nM654 P60\nM653 S0\nM656 S0\nM107 T0\nM107 T1\nM204 S1000\nM900 K0.000 T0\nM900 K0.000 T1\nG90\nG1 Z50.000 F420\nM7 T0\n{if is_extruder_used[0]}M6 T0{endif}\n{if is_extruder_used[1]}M6 T1{endif}\n{if filament_type[initial_extruder]==\"PLA\" or filament_type[initial_extruder]==\"PETG\" or filament_type[initial_extruder]==\"PVA\"}M651 S255{else}M652{endif}\n;layer_count: {total_layer_count}\nM108 T{initial_extruder}",
     "machine_end_gcode": ";end gcode\nM107 T0\nM107 T1\nM104 S0 T0\nM104 S0 T1\nM140 S0 T0\nG162 Z F1800\nM652\nG91\nM18",
     "change_filament_gcode": ";switch nozzle\nM108 T[next_extruder]",
     "before_layer_change_gcode": ";layer:{layer_z}",

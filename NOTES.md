@@ -17,6 +17,12 @@ Orca speaks Marlin; the Creator 4 speaks FlashForge. `gx_post.py` translates:
 | `M84` | `M18` |
 | `Z.2` | `Z0.2` |
 | — | `M118 X.. Y.. Z.. T0` bounding box inserted |
+| `;layer_count:11` | `;layer_count: 11` |
+| `;layer:0.2` | `;layer:0.20` |
+
+The last two are not cosmetic. FlashPrint writes a space after `layer_count:` and two
+decimals on every `;layer:` marker, and the firmware's parser wants both — without them
+the printer prints happily but shows no layer progress.
 
 Then it builds the container: 58-byte header, 80 × 60 BMP preview at offset 58, 320 × 320
 PNG preview at 14512, G-code after that. Orca's own thumbnail becomes the PNG and is

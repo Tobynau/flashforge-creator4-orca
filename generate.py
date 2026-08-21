@@ -68,10 +68,10 @@ START_GCODE = "\n".join([
     "{if is_extruder_used[1]}M6 T1{endif}",
     '{if filament_type[initial_extruder]=="PLA" or filament_type[initial_extruder]=="PETG"'
     ' or filament_type[initial_extruder]=="PVA"}M651 S255{else}M652{endif}',
+    ";layer_count: {total_layer_count}",
     # Orca emits no tool select when only one extruder is in use, so the head
     # has to be named here or the printer keeps driving whichever was last active
     "M108 T{initial_extruder}",
-    ";layer_count:{total_layer_count}",
 ])
 
 END_GCODE = "\n".join([

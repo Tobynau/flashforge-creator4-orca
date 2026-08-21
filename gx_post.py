@@ -169,7 +169,7 @@ def parse_time(text):
     return total
 
 
-def convert(lines, max_z=None):
+def convert(lines, max_z=None, total_layers=0):
     """Return (converted_lines, info dict)."""
     out = []
     tool = 0
@@ -186,6 +186,8 @@ def convert(lines, max_z=None):
     bed_temp = 0
     in_thumb = False
     m118_at = None
+    layer_count_at = None
+    first_layer_at = None
 
     for raw in lines:
         line = raw.rstrip("\r\n")
@@ -200,6 +202,17 @@ def convert(lines, max_z=None):
             continue
 
         if not stripped or stripped.startswith(";"):
+            m = re.match(r";layer_count:\s*(\d+)\s*$", stripped)
+            if m:
+                layer_count_at = len(out)
+                out.append(";layer_count: %s" % m.group(1))
+                continue
+            m = re.match(r";layer:\s*([\d.]+)\s*$", stripped)
+            if m:
+                if first_layer_at is None:
+                    first_layer_at = len(out)
+                out.append(";layer:%.2f" % float(m.group(1)))
+                continue
             out.append(line)
             continue
 
@@ -365,6 +378,11 @@ def convert(lines, max_z=None):
         "used": used,
     }
 
+    if layer_count_at is None and first_layer_at is not None and total_layers:
+        out.insert(first_layer_at, ";layer_count: %d" % total_layers)
+        if m118_at is not None and m118_at > first_layer_at:
+            m118_at += 1
+
     # If nothing ever selected a tool, the printer keeps whatever head was last
     # active - which prints nothing when that head is not the loaded one.
     if not any(l.startswith("M108") for l in out):
@@ -421,6 +439,9 @@ def scrape(text):
         "travel": find(r"^; travel_speed = ([\d.]+)", 100, float),
         "max_z": find(r"^; max_z_height: ([\d.]+)", None, float),
         "nozzle_temps": find(r"^; nozzle_temperature = ([\d, ]+)", ""),
+        "top_layers": find(r"^; top_shell_layers = (\d+)", 4),
+        "bottom_layers": find(r"^; bottom_shell_layers = (\d+)", 3),
+        "fill_pattern": find(r"^; sparse_infill_pattern = (\w+)", "grid"),
     }
 
 
@@ -460,10 +481,16 @@ def ff_header_comments(meta):
         ";left_extruder_temperature: %d" % meta["t1"],
         ";layer_height: %s" % meta["layer_height"],
         ";perimeter_shells: %d" % meta["shells"],
+        ";top_solid_layers: %s" % meta["top_layers"],
+        ";bottom_solid_layers: %s" % meta["bottom_layers"],
+        ";fill_pattern: %s" % meta["fill_pattern"],
         ";fill_density: %s" % meta["fill"],
         ";base_print_speed: %d" % round(meta["speed"]),
         ";travel_speed: %d" % round(meta["travel"]),
         ";platform_temperature: %d" % meta["bed_temp"],
+        ";right_extruder_temperature_raft0: %d" % meta["t0"],
+        ";right_extruder_temperature_reset: ",
+        ";left_extruder_temperature_reset: ",
         ";layer_total_count: %d" % meta["layers"],
         "",
     ])
@@ -550,7 +577,7 @@ def main(argv):
     text = blob.decode("utf-8", "replace")
     thumb, png = extract_thumbnail(text)
     meta = scrape(text)
-    lines, info = convert(text.splitlines(), meta["max_z"])
+    lines, info = convert(text.splitlines(), meta["max_z"], meta["layers"])
     meta["bed_temp"] = info["bed_temp"]
     configured = [int(float(v)) for v in meta["nozzle_temps"].split(",") if v.strip()]
     meta["t0"] = configured[0] if configured else info["temps"].get(0, 0)
