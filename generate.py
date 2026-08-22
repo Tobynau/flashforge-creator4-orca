@@ -68,6 +68,31 @@ START_GCODE = "\n".join([
     "{if is_extruder_used[1]}M6 T1{endif}",
     '{if filament_type[initial_extruder]=="PLA" or filament_type[initial_extruder]=="PETG"'
     ' or filament_type[initial_extruder]=="PVA"}M651 S255{else}M652{endif}',
+    # Prime line along the front of the plate, centred in X so either head can
+    # reach it. Absolute E here: the printer is in absolute mode and Orca's own
+    # M83 has not been emitted yet.
+    "{if is_extruder_used[0]}M108 T0",
+    "G1 Z{initial_layer_print_height} F420",
+    "G1 X-50 Y-165 F6000",
+    "G92 E0",
+    "G1 X50 Y-165 E10 F1200",
+    "G1 X50 Y-164.2 F6000",
+    "G1 X-50 Y-164.2 E20 F1200",
+    "G92 E0",
+    "G1 E-1 F1800",
+    "G1 Z2 F420",
+    "G1 X60 Y-164.2 F6000{endif}",
+    "{if is_extruder_used[1]}M108 T1",
+    "G1 Z{initial_layer_print_height} F420",
+    "G1 X-50 Y-162 F6000",
+    "G92 E0",
+    "G1 X50 Y-162 E10 F1200",
+    "G1 X50 Y-161.2 F6000",
+    "G1 X-50 Y-161.2 E20 F1200",
+    "G92 E0",
+    "G1 E-1 F1800",
+    "G1 Z2 F420",
+    "G1 X60 Y-161.2 F6000{endif}",
     ";layer_count: {total_layer_count}",
     # Orca emits no tool select when only one extruder is in use, so the head
     # has to be named here or the printer keeps driving whichever was last active

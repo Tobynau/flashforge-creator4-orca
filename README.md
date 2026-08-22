@@ -27,12 +27,16 @@ Pick your machine in Orca under **Custom Printer → Generic Marlin Printer**.
 ## Using it
 
 Extruder 1 = T0 = **right** head, extruder 2 = T1 = **left**; assign an object to filament
-2 to print it on the left. Export writes a ready-to-copy `.gx`. To inspect one:
+2 to print it on the left. A prime bead is laid along the front edge before each print.
+Export writes a ready-to-copy `.gx`. To inspect one:
 
 ```bash
 python3 gx_post.py --info yourfile.gx     # previews, time, filament, temps
 python3 gx_post.py --dump yourfile.gx     # the G-code back out
 ```
+
+The printer takes plain G-code too — `gx_post.py --plain` skips the container, at the cost
+of the preview, time and layer count on the printer's screen.
 
 Dual-material is set up but untested — Orca 2.4.0-alpha's CLI cannot slice two filaments
 at all, so that path has only been checked against hand-written G-code.

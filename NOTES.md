@@ -53,6 +53,30 @@ is the **centre** of the plate, as on the machine itself, so X runs −200 → 2
 −175 → 175. To model a head that cannot reach the far side, narrow its polygon — jog each
 head to its limits from the printer's panel and read the coordinates off the display.
 
+## Prime line
+
+The start G-code lays a two-pass prime bead along the front of the plate before the print
+starts — X −50 → +50, i.e. centred, so either head can reach it, at Y −165 for the right
+head and Y −162 for the left. Both heads get one when both are in use. Extrusion there is
+absolute (`G92 E0` … `G92 E0`), because Orca has not emitted its `M83` yet at that point
+in the file.
+
+To move or resize it, edit `START_GCODE` in `generate.py`. Remember the origin is the
+middle of the plate.
+
+## File formats
+
+The Creator 4 accepts plain text G-code as well as `.gx`, so the container is optional —
+what it is *not* optional about is the dialect. Run the post-processor with `--plain` to
+get readable G-code and set the process preset's filename format to `.gcode` or `.g`:
+
+```bash
+python3 gx_post.py --plain plate_1.gcode
+```
+
+The trade-off is the display: without the container the printer has no preview, no time
+estimate and no layer count, since all three live in the `.gx` header.
+
 ## Machine details
 
 Bed 400 × 350 × 500 mm, origin centred. Start and end G-code are FlashPrint's, with Orca

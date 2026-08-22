@@ -15,8 +15,12 @@ Everything here was derived from a working FlashPrint .gx file for this
 printer, so the emitted file should be byte-compatible with what the machine
 expects.
 
+The printer also accepts plain text G-code files, so --plain skips the container
+and leaves readable G-code; you lose the on-screen preview, time and layer count.
+
 Usage (Orca calls it like this):  python3 gx_post.py <file>
 Standalone:                       python3 gx_post.py foo.gcode [-o foo.gx]
+Dialect only, no container:       python3 gx_post.py --plain foo.gcode
 """
 
 import base64
@@ -591,6 +595,13 @@ def main(argv):
         meta["used"] = info["used"]
 
     gcode = ff_header_comments(meta) + "\n".join(lines) + "\n"
+    if "--plain" in argv:
+        tmp = out_path + ".tmp"
+        with open(tmp, "w") as fh:
+            fh.write(gcode)
+        os.replace(tmp, out_path)
+        log(out_path, meta, 0, 0)
+        return 0
     bmp = make_bmp(thumb)
     payload = gcode.encode("utf-8", "replace")
     header = build_header(meta, 58 + len(bmp), 58 + len(bmp) + len(png))
