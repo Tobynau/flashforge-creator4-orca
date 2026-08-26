@@ -53,16 +53,45 @@ is the **centre** of the plate, as on the machine itself, so X runs −200 → 2
 −175 → 175. To model a head that cannot reach the far side, narrow its polygon — jog each
 head to its limits from the printer's panel and read the coordinates off the display.
 
-## Prime line
+## Priming
 
-The start G-code lays a two-pass prime bead along the front of the plate before the print
-starts — X −50 → +50, i.e. centred, so either head can reach it, at Y −165 for the right
-head and Y −162 for the left. Both heads get one when both are in use. Extrusion there is
-absolute (`G92 E0` … `G92 E0`), because Orca has not emitted its `M83` yet at that point
-in the file.
+Two options, both in `generate.py`.
 
-To move or resize it, edit `START_GCODE` in `generate.py`. Remember the origin is the
-middle of the plate.
+**Default — a bead on the plate.** Two passes along the front, X −50 → +50 so either head
+can reach it, at Y −165 for the right head and Y −162 for the left. Both heads get one when
+both are in use. Extrusion there is absolute (`G92 E0` … `G92 E0`), because Orca has not
+emitted its `M83` yet at that point in the file.
+
+**Purge on the wipe plates.** The Creator 4 has a plate past each end of the X axis that
+the nozzles park on, so purging there and dragging the nozzle across is tidier — nothing
+to peel off the build plate. Set `WIPE_PAD["enabled"] = True` and re-run `generate.py`:
+
+```
+M108 T0
+G1 Z5.00 F420
+G1 X205.00 Y0.00 F6000     ; onto the plate
+G92 E0
+G1 E20.0 F180              ; slow purge, so it coils rather than whips
+G92 E0
+G1 E-1 F1800
+G1 X180.00 F3000           ; drag towards the middle
+G1 X205.00 F3000           ; and back, twice
+G1 X180.00 F3000
+G1 X205.00 F3000
+G1 X180.00 F6000
+```
+
+**The X coordinates in there are guesses and must be measured first.** The plates sit
+outside the printable area, so these moves drive the head past X ±200 — get them wrong and
+the carriage runs into the frame rather than stopping on the plate. Jog each head onto its
+plate from the printer's move menu, read X off the display, and put those numbers in
+`WIPE_PAD["right_x"]` and `["left_x"]`. `z` is the nozzle height above the plate while
+purging, `scrape_mm` how far back towards the middle the drag goes, `passes` how many
+times.
+
+Worth checking first whether the firmware already does this by itself — the FlashPrint
+reference file contains no purge or wipe sequence at all, which either means FlashPrint
+leans on the raft, or the machine wipes on its own at print start.
 
 ## Dual material
 

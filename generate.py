@@ -26,6 +26,68 @@ GX_POST = "__GX_POST_COMMAND__"
 # layer heights offered per nozzle, coarsest last
 LAYERS = {0.4: [0.12, 0.18, 0.24], 0.6: [0.18, 0.28, 0.36], 0.8: [0.24, 0.36, 0.48]}
 
+
+# --------------------------------------------------------------------------
+# priming
+# --------------------------------------------------------------------------
+# The Creator 4 has a wipe plate past each end of the X axis - the right head
+# parks on the right one, the left head on the left. Purging onto those and
+# dragging the nozzle across them is cleaner than a bead on the plate, but it
+# means driving the head OUTSIDE the printable area, so the coordinates have to
+# be right. Measure them on the machine (jog each head onto its plate from the
+# printer's own move menu and read X off the display) before switching this on.
+#
+# Until then the fallback is a two-pass bead along the front of the plate.
+WIPE_PAD = {
+    "enabled": False,
+    "right_x": 205.0,        # UNVERIFIED - measure before enabling
+    "left_x": -205.0,        # UNVERIFIED - measure before enabling
+    "y": 0.0,                # where along the plate to sit
+    "z": 5.0,                # nozzle height over the plate while purging
+    "purge_mm": 20.0,        # filament extruded onto the plate
+    "scrape_mm": 25.0,       # how far to drag back towards the middle
+    "passes": 2,
+}
+
+
+def prime_block(extruder):
+    """Prime sequence for one head, as a list of G-code lines."""
+    tool = "T%d" % extruder
+    if not WIPE_PAD["enabled"]:
+        # bead along the front of the plate, centred in X so either head reaches it
+        y = -165.0 + extruder * 3.0
+        return [
+            "M108 " + tool,
+            "G1 Z{initial_layer_print_height} F420",
+            "G1 X-50 Y%.1f F6000" % y,
+            "G92 E0",
+            "G1 X50 Y%.1f E10 F1200" % y,
+            "G1 X50 Y%.1f F6000" % (y + 0.8),
+            "G1 X-50 Y%.1f E20 F1200" % (y + 0.8),
+            "G92 E0",
+            "G1 E-1 F1800",
+            "G1 Z2 F420",
+            "G1 X60 Y%.1f F6000" % (y + 0.8),
+        ]
+
+    pad = WIPE_PAD["right_x"] if extruder == 0 else WIPE_PAD["left_x"]
+    inward = -1.0 if extruder == 0 else 1.0      # towards the middle of the bed
+    scrape = WIPE_PAD["scrape_mm"] * inward
+    lines = [
+        "M108 " + tool,
+        "G1 Z%.2f F420" % WIPE_PAD["z"],
+        "G1 X%.2f Y%.2f F6000" % (pad, WIPE_PAD["y"]),
+        "G92 E0",
+        "G1 E%.1f F180" % WIPE_PAD["purge_mm"],   # slow, so it coils on the plate
+        "G92 E0",
+        "G1 E-1 F1800",
+    ]
+    for _ in range(WIPE_PAD["passes"]):
+        lines.append("G1 X%.2f F3000" % (pad + scrape))   # drag across the plate
+        lines.append("G1 X%.2f F3000" % pad)
+    lines.append("G1 X%.2f F6000" % (pad + scrape))
+    return lines
+
 # --------------------------------------------------------------------------
 # printers
 # --------------------------------------------------------------------------
@@ -68,31 +130,8 @@ START_GCODE = "\n".join([
     "{if is_extruder_used[1]}M6 T1{endif}",
     '{if filament_type[initial_extruder]=="PLA" or filament_type[initial_extruder]=="PETG"'
     ' or filament_type[initial_extruder]=="PVA"}M651 S255{else}M652{endif}',
-    # Prime line along the front of the plate, centred in X so either head can
-    # reach it. Absolute E here: the printer is in absolute mode and Orca's own
-    # M83 has not been emitted yet.
-    "{if is_extruder_used[0]}M108 T0",
-    "G1 Z{initial_layer_print_height} F420",
-    "G1 X-50 Y-165 F6000",
-    "G92 E0",
-    "G1 X50 Y-165 E10 F1200",
-    "G1 X50 Y-164.2 F6000",
-    "G1 X-50 Y-164.2 E20 F1200",
-    "G92 E0",
-    "G1 E-1 F1800",
-    "G1 Z2 F420",
-    "G1 X60 Y-164.2 F6000{endif}",
-    "{if is_extruder_used[1]}M108 T1",
-    "G1 Z{initial_layer_print_height} F420",
-    "G1 X-50 Y-162 F6000",
-    "G92 E0",
-    "G1 X50 Y-162 E10 F1200",
-    "G1 X50 Y-161.2 F6000",
-    "G1 X-50 Y-161.2 E20 F1200",
-    "G92 E0",
-    "G1 E-1 F1800",
-    "G1 Z2 F420",
-    "G1 X60 Y-161.2 F6000{endif}",
+    "{if is_extruder_used[0]}" + "\n".join(prime_block(0)) + "{endif}",
+    "{if is_extruder_used[1]}" + "\n".join(prime_block(1)) + "{endif}",
     ";layer_count: {total_layer_count}",
     # Orca emits no tool select when only one extruder is in use, so the head
     # has to be named here or the printer keeps driving whichever was last active
