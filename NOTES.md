@@ -39,7 +39,7 @@ G-code therefore ends with `M108 T{initial_extruder}`, and the post-processor in
 if it ever sees a file that extrudes without picking a head first.
 
 **`extruder_printable_area` needs `extruder_printable_height` next to it.** Set the area
-alone and OrcaSlicer 2.4.0-alpha asserts and dies mid-slice. Both are set, currently to
+alone and OrcaSlicer asserts and dies mid-slice — still true as of 2.4.2. Both are set, currently to
 the full plate for both heads:
 
 ```json
@@ -110,16 +110,16 @@ by a 120 mm/s ceiling, because the gantry carries two heads.
 
 ## What is verified, and what is not
 
-Verified by slicing through Orca's CLI and inspecting the result: single-extruder prints
+Verified by slicing through Orca 2.4.2's CLI and inspecting the result: single-extruder prints
 across the 4-A/4-S/4-HT and 0.4/0.6/0.8 combinations slice cleanly; `M108` selects a head;
 extrusion is absolute and resets every layer; no heater or fan command is left without a
 tool index; the `.gx` header matches the FlashPrint reference field for field; the
 PNG → BMP preview conversion is pixel-exact; the fallback time estimate lands within a few
 percent of Orca's own.
 
-**Not verified: dual-material output.** Orca 2.4.0-alpha's CLI crashes on every
-two-filament slice — reproduced with the stock Snapmaker J1 and Bambu H2D profiles too, so
-it is an Orca bug rather than anything here, but it does mean the two-head path has only
+**Not verified: dual-material output.** Orca's CLI crashes on every two-filament slice —
+reproduced on 2.4.0-alpha and again on 2.4.2, with the stock Snapmaker J1 and Bambu H2D
+profiles too, so it is an Orca bug rather than anything here, but it does mean the two-head path has only
 been exercised against hand-written G-code. Before a long dual print: run the printer's
 nozzle offset calibration (Orca sends both heads the same coordinates and lets the
 firmware apply the offset, exactly as FlashPrint does), print something small in two

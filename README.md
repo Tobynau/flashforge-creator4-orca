@@ -1,8 +1,9 @@
 # OrcaSlicer profiles for the FlashForge Creator 4
 
-Orca has no Creator 4 profile, and the printer takes neither plain Marlin G-code nor plain
-`.gcode` files. This adds the presets, plus a post-processing script that rewrites Orca's
-output into the FlashForge dialect and wraps it in a `.gx` container like FlashPrint's.
+Orca has no Creator 4 profile, and the Creator 4 does not speak plain Marlin G-code. This
+adds the presets, plus a post-processing script that rewrites Orca's output into the
+FlashForge dialect and wraps it in a `.gx` container like FlashPrint's. Tested against
+OrcaSlicer 2.4.2.
 
 * **Printers** — 4-A, 4-S, 4-HT × 0.4 / 0.6 / 0.8 nozzle
 * **Processes** — three layer heights × Standard/Fast per nozzle, flow-capped
@@ -38,8 +39,9 @@ python3 gx_post.py --dump yourfile.gx     # the G-code back out
 The printer takes plain G-code too — `gx_post.py --plain` skips the container, at the cost
 of the preview, time and layer count on the printer's screen.
 
-Dual-material is set up but untested — Orca 2.4.0-alpha's CLI cannot slice two filaments
-at all, so that path has only been checked against hand-written G-code.
+Dual-material is set up but untested — Orca's CLI cannot slice two filaments at all
+(reproduced on 2.4.0-alpha and 2.4.2, stock profiles included), so that path has only
+been checked against hand-written G-code.
 
 `presets/` is generated; edit `generate.py` and re-run it. [NOTES.md](NOTES.md) covers the
 G-code translation, the `.gx` layout, per-nozzle X limits, and what is and isn't verified.
