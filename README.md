@@ -36,6 +36,10 @@ python3 gx_post.py --info yourfile.gx     # previews, time, filament, temps
 python3 gx_post.py --dump yourfile.gx     # the G-code back out
 ```
 
+Duplicate and mirror printing have their own presets — `… 0.4 nozzle DUPLICATE` and
+`… MIRROR` — with the build area narrowed to one copy's worth and both nozzles driven from
+one toolpath.
+
 The printer takes plain G-code too — `gx_post.py --plain` skips the container, at the cost
 of the preview, time and layer count on the printer's screen.
 

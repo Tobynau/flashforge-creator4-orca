@@ -32,6 +32,13 @@ import sys
 import zlib
 
 MAGIC = b"xgcode 1.0\n\x00"
+# FlashPrint signals duplicate/mirror three ways at once: a command after the
+# start block, a suffix on M118, and the header flag. Match all three.
+MODES = {
+    "normal":    dict(command=None,       m118="T0",       flag=15),
+    "duplicate": dict(command="M109 T2",  m118="T0 T1 D2", flag=31),
+    "mirror":    dict(command="M109 T1",  m118="T0 T1 D1", flag=47),
+}
 ACCEL = 1000.0                                     # mm/s^2, for the fallback estimate
 SHORT_MOVE = 0.75                                  # mm, below which moves chain together
 BMP_W, BMP_H = 80, 60
@@ -190,6 +197,9 @@ def convert(lines, max_z=None, total_layers=0):
     bed_temp = 0
     in_thumb = False
     m118_at = None
+    mode = "normal"
+    printing = False
+    tool_selected = False
     layer_count_at = None
     first_layer_at = None
 
@@ -213,6 +223,7 @@ def convert(lines, max_z=None, total_layers=0):
                 continue
             m = re.match(r";layer:\s*([\d.]+)\s*$", stripped)
             if m:
+                printing = True
                 if first_layer_at is None:
                     first_layer_at = len(out)
                 out.append(";layer:%.2f" % float(m.group(1)))
@@ -248,14 +259,29 @@ def convert(lines, max_z=None, total_layers=0):
         # bare tool change -> FlashForge tool select
         m = re.fullmatch(r"T(\d+)", stripped)
         if m:
-            tool = int(m.group(1))
+            want = int(m.group(1))
+            if tool_selected and want == tool:
+                continue                       # already on that head
+            tool, tool_selected = want, True
             out.append("M108 T%d" % tool)
+            continue
+
+        if code == "M109" and field(line, "S") is None:
+            t = field(line, "T")
+            for name, spec in MODES.items():
+                if spec["command"] and t is not None and \
+                        spec["command"] == "M109 T%d" % int(float(t)):
+                    mode = name
+            out.append(line)
             continue
 
         if code == "M108":
             t = field(line, "T")
             if t is not None:
-                tool = int(float(t))
+                want = int(float(t))
+                if tool_selected and want == tool:
+                    continue                   # redundant, FlashPrint emits one
+                tool, tool_selected = want, True
             out.append(line)
             continue
 
@@ -361,7 +387,7 @@ def convert(lines, max_z=None, total_layers=0):
                     seconds += dist / v + v / ACCEL
                 else:
                     seconds += 2.0 * math.sqrt(dist / ACCEL)
-            if field(line, "E") is not None and (nx is not None or ny is not None):
+            if printing and field(line, "E") is not None and (nx is not None or ny is not None):
                 minx, maxx = min(minx, x), max(maxx, x)
                 miny, maxy = min(miny, y), max(maxy, y)
                 maxz = max(maxz, z)
@@ -375,6 +401,7 @@ def convert(lines, max_z=None, total_layers=0):
     if max_z:
         maxz = max_z
     info = {
+        "mode": mode,
         "size": (maxx - minx, maxy - miny, maxz),
         "temps": temps,
         "bed_temp": bed_temp,
@@ -389,7 +416,7 @@ def convert(lines, max_z=None, total_layers=0):
 
     # If nothing ever selected a tool, the printer keeps whatever head was last
     # active - which prints nothing when that head is not the loaded one.
-    if not any(l.startswith("M108") for l in out):
+    if mode == "normal" and not any(l.startswith("M108") for l in out):
         want = max(temps, key=lambda t: temps[t]) if temps else 0
         anchor = m118_at if m118_at is not None else 0
         out.insert(anchor, "M108 T%d" % want)
@@ -398,8 +425,9 @@ def convert(lines, max_z=None, total_layers=0):
 
     # FlashPrint announces the model's bounding box before it heats up
     if m118_at is not None:
-        out.insert(m118_at, "M118 X%.2f Y%.2f Z%.2f T0"
-                   % (info["size"][0], info["size"][1], info["size"][2]))
+        out.insert(m118_at, "M118 X%.2f Y%.2f Z%.2f %s"
+                   % (info["size"][0], info["size"][1], info["size"][2],
+                      MODES[mode]["m118"]))
     return out, info
 
 
@@ -459,7 +487,7 @@ def build_header(meta, png_offset, gcode_offset):
     struct.pack_into("<I", h, 28, int(meta["seconds"]))
     struct.pack_into("<I", h, 32, int(meta["used"][0]))
     struct.pack_into("<I", h, 36, int(meta["used"][1]))
-    struct.pack_into("<H", h, 40, 15)               # multi-extruder flag
+    struct.pack_into("<H", h, 40, meta["flag"])     # normal / duplicate / mirror
     struct.pack_into("<H", h, 42, int(round(meta["layer_height"] * 1000)))
     struct.pack_into("<H", h, 44, 0)
     struct.pack_into("<H", h, 46, int(meta["shells"]))
@@ -481,6 +509,7 @@ def ff_header_comments(meta):
         ";left_extruder_material: %s" % meta["material2"],
         ";right_extruder_material_density: %s" % meta["density"],
         ";filament_diameter0: 1.75",
+        ";filament_diameter1: 1.75",
         ";right_extruder_temperature: %d" % meta["t0"],
         ";left_extruder_temperature: %d" % meta["t1"],
         ";layer_height: %s" % meta["layer_height"],
@@ -542,6 +571,8 @@ def show_info(path):
     print("  layer height: %.2f mm   shells: %d   speed: %d mm/s"
           % (f[8] / 1000.0, f[10], f[11]))
     print("  temps       : bed %d, right %d, left %d" % (f[12], f[13], f[14]))
+    mode = [n for n, m in MODES.items() if m["flag"] == f[7]]
+    print("  mode        : %s" % (mode[0] if mode else "unknown (flag %d)" % f[7]))
     return 0
 
 
@@ -583,6 +614,7 @@ def main(argv):
     meta = scrape(text)
     lines, info = convert(text.splitlines(), meta["max_z"], meta["layers"])
     meta["bed_temp"] = info["bed_temp"]
+    meta["flag"] = MODES[info["mode"]]["flag"]
     configured = [int(float(v)) for v in meta["nozzle_temps"].split(",") if v.strip()]
     meta["t0"] = configured[0] if configured else info["temps"].get(0, 0)
     meta["t1"] = (configured[1] if len(configured) > 1 else meta["t0"])
@@ -593,6 +625,9 @@ def main(argv):
         meta["seconds"] = info["seconds"]
     if not any(meta["used"]):
         meta["used"] = info["used"]
+    if info["mode"] != "normal":
+        # one toolpath, two heads following it
+        meta["used"][1] = meta["used"][0]
 
     gcode = ff_header_comments(meta) + "\n".join(lines) + "\n"
     if "--plain" in argv:

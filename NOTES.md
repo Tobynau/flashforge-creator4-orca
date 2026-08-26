@@ -111,6 +111,34 @@ on the object, raise it; if the tower is enormous, it went the wrong way.
 The prime tower is 60 mm wide at the front left (`wipe_tower_x/y` = −180 / −160). Keep
 that corner clear.
 
+## Duplicate and mirror
+
+FlashPrint signals these three ways at once, and the presets and post-processor reproduce
+all three, because there is no way to tell which one the firmware actually reads:
+
+| | single | duplicate | mirror |
+| --- | --- | --- | --- |
+| `M118` suffix | `T0` | `T0 T1 D2` | `T0 T1 D1` |
+| command after the start block | `M108 T0` | `M109 T2` | `M109 T1` |
+| header flag at offset 40 | 15 | 31 | 47 |
+
+`M653 S0` is identical in all three, so despite sitting in the start block it is not the
+mode switch.
+
+Pick `Flashforge Creator 4-X 0.4 nozzle DUPLICATE` or `… MIRROR` in the printer dropdown.
+Those presets are single-extruder — one toolpath, both heads following it — but the start
+G-code heats and waits for both nozzles, and the prime bead is laid *after* the mode
+command so it is duplicated too and both nozzles get purged. There is no `M108` anywhere
+in them, matching FlashPrint.
+
+The build area narrows to 175 × 350, centred, which is FlashForge's published figure for
+duplication on this machine rather than anything measured. If FlashPrint shows you a
+different plate size in duplicate mode, change `half_x` in `IDEX_MODES` and re-run
+`generate.py`.
+
+Untested on hardware: the G-code matches the reference file's structure, but nobody has
+run one of these prints yet.
+
 ## File formats
 
 The Creator 4 accepts plain text G-code as well as `.gx`, so the container is optional —

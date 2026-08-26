@@ -1,0 +1,194 @@
+{
+    "type": "machine",
+    "name": "Flashforge Creator 4-HT 0.6 nozzle MIRROR",
+    "from": "User",
+    "inherits": "MyMarlin 0.4 nozzle",
+    "instantiation": "true",
+    "is_custom_defined": "0",
+    "printer_settings_id": "Flashforge Creator 4-HT 0.6 nozzle MIRROR",
+    "printer_variant": "0.6",
+    "printer_technology": "FFF",
+    "printer_structure": "i3",
+    "version": "2.4.0.0",
+    "nozzle_diameter": [
+        "0.6"
+    ],
+    "extruder_offset": [
+        "0x0"
+    ],
+    "extruder_colour": [
+        "#FF6600"
+    ],
+    "single_extruder_multi_material": "0",
+    "nozzle_type": "hardened_steel",
+    "nozzle_hrc": "60",
+    "nozzle_volume": "0",
+    "extruder_type": [
+        "Direct Drive"
+    ],
+    "extruder_variant_list": [
+        "Direct Drive Standard"
+    ],
+    "printer_extruder_variant": [
+        "Direct Drive Standard"
+    ],
+    "printer_extruder_id": [
+        "1"
+    ],
+    "master_extruder_id": "1",
+    "printable_area": [
+        "-87.5x-175",
+        "87.5x-175",
+        "87.5x175",
+        "-87.5x175"
+    ],
+    "printable_height": "500",
+    "bed_exclude_area": [
+        "0x0"
+    ],
+    "best_object_pos": "0.5,0.5",
+    "gcode_flavor": "marlin",
+    "use_relative_e_distances": "1",
+    "use_firmware_retraction": "0",
+    "emit_machine_limits_to_gcode": "0",
+    "remaining_times": "0",
+    "disable_m73": "1",
+    "silent_mode": "0",
+    "auxiliary_fan": "0",
+    "support_air_filtration": "0",
+    "support_chamber_temp_control": "0",
+    "support_multi_bed_types": "0",
+    "scan_first_layer": "0",
+    "manual_filament_change": "0",
+    "purge_in_prime_tower": "1",
+    "enable_filament_ramming": "0",
+    "machine_load_filament_time": "0",
+    "machine_unload_filament_time": "0",
+    "machine_tool_change_time": "10",
+    "thumbnails": [
+        "320x320"
+    ],
+    "thumbnails_format": "PNG",
+    "default_filament_profile": [
+        "Flashforge Creator 4 PLA"
+    ],
+    "default_print_profile": "0.28mm Standard @FF Creator 4 0.6",
+    "max_layer_height": [
+        "0.48"
+    ],
+    "min_layer_height": [
+        "0.12"
+    ],
+    "retraction_length": [
+        "1"
+    ],
+    "retraction_speed": [
+        "30"
+    ],
+    "deretraction_speed": [
+        "30"
+    ],
+    "retraction_minimum_travel": [
+        "1.5"
+    ],
+    "retract_when_changing_layer": [
+        "1"
+    ],
+    "retract_before_wipe": [
+        "0%"
+    ],
+    "retract_restart_extra": [
+        "0"
+    ],
+    "retract_length_toolchange": [
+        "4"
+    ],
+    "retract_restart_extra_toolchange": [
+        "0"
+    ],
+    "retract_lift_above": [
+        "0"
+    ],
+    "retract_lift_below": [
+        "0"
+    ],
+    "retract_lift_enforce": [
+        "All Surfaces"
+    ],
+    "wipe": [
+        "1"
+    ],
+    "wipe_distance": [
+        "2"
+    ],
+    "z_hop": [
+        "0"
+    ],
+    "z_hop_types": [
+        "Auto Lift"
+    ],
+    "travel_slope": [
+        "3"
+    ],
+    "long_retractions_when_cut": [
+        "0"
+    ],
+    "retraction_distances_when_cut": [
+        "18"
+    ],
+    "machine_max_speed_x": [
+        "200"
+    ],
+    "machine_max_speed_y": [
+        "200"
+    ],
+    "machine_max_speed_z": [
+        "20"
+    ],
+    "machine_max_speed_e": [
+        "60"
+    ],
+    "machine_max_acceleration_x": [
+        "2000"
+    ],
+    "machine_max_acceleration_y": [
+        "2000"
+    ],
+    "machine_max_acceleration_z": [
+        "200"
+    ],
+    "machine_max_acceleration_e": [
+        "3000"
+    ],
+    "machine_max_acceleration_extruding": [
+        "2000"
+    ],
+    "machine_max_acceleration_retracting": [
+        "2000"
+    ],
+    "machine_max_acceleration_travel": [
+        "2000"
+    ],
+    "machine_max_jerk_x": [
+        "8"
+    ],
+    "machine_max_jerk_y": [
+        "8"
+    ],
+    "machine_max_jerk_z": [
+        "0.4"
+    ],
+    "machine_max_jerk_e": [
+        "5"
+    ],
+    "machine_pause_gcode": "M25",
+    "machine_start_gcode": ";start gcode\n;machine_type: Creator 4\nM140 S{bed_temperature_initial_layer_single} T0\nM104 S{nozzle_temperature_initial_layer[0]} T0\nM104 S{nozzle_temperature_initial_layer[0]} T1\nM654 P60\nM653 S0\nM656 S0\nM107 T0\nM107 T1\nM204 S1000\nM900 K0.000 T0\nM900 K0.000 T1\nG90\nG1 Z50.000 F420\nM7 T0\nM6 T0\nM6 T1\n{if filament_type[initial_extruder]==\"PLA\" or filament_type[initial_extruder]==\"PETG\" or filament_type[initial_extruder]==\"PVA\"}M651 S255{else}M652{endif}\n;layer_count: {total_layer_count}\nM109 T1\nG1 Z{initial_layer_print_height} F420\nG1 X-40 Y-165.0 F6000\nG92 E0\nG1 X40 Y-165.0 E8 F1200\nG1 X40 Y-164.2 F6000\nG1 X-40 Y-164.2 E16 F1200\nG92 E0\nG1 E-1 F1800\nG1 Z2 F420\nG1 X50 Y-164.2 F6000",
+    "machine_end_gcode": ";end gcode\nM107 T0\nM107 T1\nM104 S0 T0\nM104 S0 T1\nM140 S0 T0\nG162 Z F1800\nM652\nG91\nM18",
+    "change_filament_gcode": ";switch nozzle\nM108 T[next_extruder]",
+    "before_layer_change_gcode": ";layer:{layer_z}",
+    "layer_change_gcode": "G92 E0",
+    "time_lapse_gcode": "",
+    "printing_by_object_gcode": "",
+    "template_custom_gcode": "",
+    "printer_notes": "PRINTER_VENDOR_FLASHFORGE\nPRINTER_MODEL_CREATOR_4_HT\nCreator 4-HT: high temperature extruder, up to 360 C.\nExtruder 1 = T0 = RIGHT head, Extruder 2 = T1 = LEFT head.\nBed origin is the CENTRE of the plate (-200..200 X, -175..175 Y), as in FlashPrint.\nOutput is post-processed into .gx - see the process preset's post-processing script."
+}

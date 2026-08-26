@@ -59,15 +59,15 @@ def prime_block(extruder):
         return [
             "M108 " + tool,
             "G1 Z{initial_layer_print_height} F420",
-            "G1 X-50 Y%.1f F6000" % y,
+            "G1 X-40 Y%.1f F6000" % y,
             "G92 E0",
-            "G1 X50 Y%.1f E10 F1200" % y,
-            "G1 X50 Y%.1f F6000" % (y + 0.8),
-            "G1 X-50 Y%.1f E20 F1200" % (y + 0.8),
+            "G1 X40 Y%.1f E8 F1200" % y,
+            "G1 X40 Y%.1f F6000" % (y + 0.8),
+            "G1 X-40 Y%.1f E16 F1200" % (y + 0.8),
             "G92 E0",
             "G1 E-1 F1800",
             "G1 Z2 F420",
-            "G1 X60 Y%.1f F6000" % (y + 0.8),
+            "G1 X50 Y%.1f F6000" % (y + 0.8),
         ]
 
     pad = WIPE_PAD["right_x"] if extruder == 0 else WIPE_PAD["left_x"]
@@ -104,39 +104,60 @@ HOTENDS = {
 }
 NOZZLES = [0.4, 0.6, 0.8]
 
+# Duplicate and mirror, as FlashPrint drives them: the command goes after the
+# start block, both heads are heated, and one toolpath feeds both. The window
+# is the per-copy build area from FlashForge's spec, 175 x 350.
+IDEX_MODES = {
+    "": None,
+    "DUPLICATE": dict(command="M109 T2", half_x=87.5),
+    "MIRROR": dict(command="M109 T1", half_x=87.5),
+}
+
 BED = ["-200x-175", "200x-175", "200x175", "-200x175"]
 BED_FLAT = "-200x-175,200x-175,200x175,-200x175"
 
-START_GCODE = "\n".join([
-    ";start gcode",
-    ";machine_type: Creator 4",
-    "M140 S{bed_temperature_initial_layer_single} T0",
-    "{if is_extruder_used[0]}M104 S{nozzle_temperature_initial_layer[0]} T0"
-    "{else}M104 S0 T0{endif}",
-    "{if is_extruder_used[1]}M104 S{nozzle_temperature_initial_layer[1]} T1"
-    "{else}M104 S0 T1{endif}",
-    "M654 P60",
-    "M653 S0",
-    "M656 S0",
-    "M107 T0",
-    "M107 T1",
-    "M204 S1000",
-    "M900 K0.000 T0",
-    "M900 K0.000 T1",
-    "G90",
-    "G1 Z50.000 F420",
-    "M7 T0",
-    "{if is_extruder_used[0]}M6 T0{endif}",
-    "{if is_extruder_used[1]}M6 T1{endif}",
-    '{if filament_type[initial_extruder]=="PLA" or filament_type[initial_extruder]=="PETG"'
-    ' or filament_type[initial_extruder]=="PVA"}M651 S255{else}M652{endif}',
-    "{if is_extruder_used[0]}" + "\n".join(prime_block(0)) + "{endif}",
-    "{if is_extruder_used[1]}" + "\n".join(prime_block(1)) + "{endif}",
-    ";layer_count: {total_layer_count}",
-    # Orca emits no tool select when only one extruder is in use, so the head
-    # has to be named here or the printer keeps driving whichever was last active
-    "M108 T{initial_extruder}",
-])
+def start_gcode(mode=""):
+    """Start block, straight out of the FlashPrint reference file."""
+    heat = [
+        "{if is_extruder_used[0]}M104 S{nozzle_temperature_initial_layer[0]} T0"
+        "{else}M104 S0 T0{endif}",
+        "{if is_extruder_used[1]}M104 S{nozzle_temperature_initial_layer[1]} T1"
+        "{else}M104 S0 T1{endif}",
+    ]
+    wait = [
+        "{if is_extruder_used[0]}M6 T0{endif}",
+        "{if is_extruder_used[1]}M6 T1{endif}",
+    ]
+    if mode:
+        # one filament, but both nozzles print, so both get heated and waited on
+        heat = ["M104 S{nozzle_temperature_initial_layer[0]} T0",
+                "M104 S{nozzle_temperature_initial_layer[0]} T1"]
+        wait = ["M6 T0", "M6 T1"]
+
+    lines = [";start gcode", ";machine_type: Creator 4",
+             "M140 S{bed_temperature_initial_layer_single} T0"] + heat + [
+        "M654 P60", "M653 S0", "M656 S0", "M107 T0", "M107 T1",
+        "M204 S1000", "M900 K0.000 T0", "M900 K0.000 T1",
+        "G90", "G1 Z50.000 F420", "M7 T0"] + wait + [
+        '{if filament_type[initial_extruder]=="PLA" or filament_type[initial_extruder]=="PETG"'
+        ' or filament_type[initial_extruder]=="PVA"}M651 S255{else}M652{endif}',
+    ]
+
+    if mode:
+        # mode first, then prime - so the prime is duplicated/mirrored too and
+        # both nozzles get purged. No M108 anywhere: FlashPrint emits none.
+        lines.append(";layer_count: {total_layer_count}")
+        lines.append(IDEX_MODES[mode]["command"])
+        lines += [l for l in prime_block(0) if not l.startswith("M108")]
+    else:
+        lines.append("{if is_extruder_used[0]}" + "\n".join(prime_block(0)) + "{endif}")
+        lines.append("{if is_extruder_used[1]}" + "\n".join(prime_block(1)) + "{endif}")
+        lines.append(";layer_count: {total_layer_count}")
+        # Orca emits no tool select when only one extruder is in use, so the head
+        # has to be named here or the printer keeps driving whichever was last active
+        lines.append("M108 T{initial_extruder}")
+    return "\n".join(lines)
+
 
 END_GCODE = "\n".join([
     ";end gcode", "M107 T0", "M107 T1", "M104 S0 T0", "M104 S0 T1",
@@ -144,21 +165,47 @@ END_GCODE = "\n".join([
 ])
 
 
-def machine_name(hotend, nozzle):
-    return "Flashforge Creator %s %s nozzle" % (hotend, nozzle)
+def machine_name(hotend, nozzle, mode=""):
+    name = "Flashforge Creator %s %s nozzle" % (hotend, nozzle)
+    return (name + " " + mode).strip()
 
 
-def machine(hotend, nozzle):
+def machine(hotend, nozzle, mode=""):
+    spec = HOTENDS[hotend]
+    d = nozzle
+    m = single_head(idex_machine(hotend, nozzle, mode), mode) if mode \
+        else idex_machine(hotend, nozzle, mode)
+    return m
+
+
+def single_head(d, mode):
+    """Duplicate and mirror drive both heads from one toolpath, so the preset
+    is a single-extruder printer that happens to heat two nozzles."""
+    for k, v in list(d.items()):
+        if isinstance(v, list) and len(v) == 2 and k != "printable_area":
+            d[k] = [v[0]]
+    d["nozzle_diameter"] = [d["nozzle_diameter"][0]]
+    d["printer_extruder_id"] = ["1"]
+    # only meaningful with two extruders, and area-without-height kills Orca
+    d.pop("extruder_printable_area", None)
+    d.pop("extruder_printable_height", None)
+    half = IDEX_MODES[mode]["half_x"]
+    d["printable_area"] = ["-%sx-175" % half, "%sx-175" % half,
+                           "%sx175" % half, "-%sx175" % half]
+    return d
+
+
+def idex_machine(hotend, nozzle, mode=""):
     spec = HOTENDS[hotend]
     d = nozzle
     return {
         "type": "machine",
-        "name": machine_name(hotend, nozzle),
+        "name": machine_name(hotend, nozzle, mode),
         "from": "User",
         "inherits": "MyMarlin 0.4 nozzle",
         "instantiation": "true",
         "is_custom_defined": "0",
-        "printer_settings_id": machine_name(hotend, nozzle),
+        "printer_settings_id": machine_name(hotend, nozzle, mode),
         "printer_variant": str(nozzle),
         "printer_technology": "FFF",
         "printer_structure": "i3",
@@ -246,7 +293,7 @@ def machine(hotend, nozzle):
         "machine_max_jerk_z": ["0.4"], "machine_max_jerk_e": ["5"],
 
         "machine_pause_gcode": "M25",
-        "machine_start_gcode": START_GCODE,
+        "machine_start_gcode": start_gcode(mode),
         "machine_end_gcode": END_GCODE,
         "change_filament_gcode": ";switch nozzle\nM108 T[next_extruder]",
         "before_layer_change_gcode": ";layer:{layer_z}",
@@ -424,13 +471,14 @@ def main():
     machines = []
     for hotend in HOTENDS:
         for nozzle in NOZZLES:
-            m = machine(hotend, nozzle)
-            machines.append(m["name"])
-            write("machine", m)
+            for mode in IDEX_MODES:
+                m = machine(hotend, nozzle, mode)
+                machines.append(m["name"])
+                write("machine", m)
 
     for nozzle in NOZZLES:
         # a process only fits printers with a matching nozzle
-        fits = [n for n in machines if n.endswith("%s nozzle" % nozzle)]
+        fits = [n for n in machines if " %s nozzle" % nozzle in n]
         for layer in LAYERS[nozzle]:
             for tier in TIERS:
                 write("process", process(layer, tier, nozzle, fits))

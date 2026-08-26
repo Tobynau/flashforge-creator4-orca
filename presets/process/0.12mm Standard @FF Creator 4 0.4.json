@@ -8,8 +8,14 @@
     "version": "2.4.0.0",
     "compatible_printers": [
         "Flashforge Creator 4-A 0.4 nozzle",
+        "Flashforge Creator 4-A 0.4 nozzle DUPLICATE",
+        "Flashforge Creator 4-A 0.4 nozzle MIRROR",
         "Flashforge Creator 4-S 0.4 nozzle",
-        "Flashforge Creator 4-HT 0.4 nozzle"
+        "Flashforge Creator 4-S 0.4 nozzle DUPLICATE",
+        "Flashforge Creator 4-S 0.4 nozzle MIRROR",
+        "Flashforge Creator 4-HT 0.4 nozzle",
+        "Flashforge Creator 4-HT 0.4 nozzle DUPLICATE",
+        "Flashforge Creator 4-HT 0.4 nozzle MIRROR"
     ],
     "layer_height": "0.12",
     "initial_layer_print_height": "0.2",
