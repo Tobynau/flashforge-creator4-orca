@@ -35,6 +35,10 @@
     "travel_speed": "100",
     "enable_prime_tower": "1",
     "prime_tower_width": "60",
+    "flush_multiplier": "0.05",
+    "flush_into_infill": "1",
+    "flush_into_objects": "0",
+    "flush_into_support": "1",
     "prime_tower_brim_width": "3",
     "wipe_tower_x": [
         "-180",

@@ -64,6 +64,24 @@ in the file.
 To move or resize it, edit `START_GCODE` in `generate.py`. Remember the origin is the
 middle of the plate.
 
+## Dual material
+
+In Orca: add a second filament slot with the **+** in the filament bar, then assign work to
+it — right-click an object → *Change filament* → 2, per-part assignment for multi-part
+models, or the colour painting tool for regions of a single mesh. Soluble or contrast
+supports go on the second head via Process → Support → *Support filament* and *Support
+interface filament*. Filament 1 is the right nozzle, filament 2 the left.
+
+Purge volumes are set for a real dual-nozzle machine rather than a single-nozzle
+multi-material one. Orca's default flush of ~84 mm³ per tool change assumes it has to push
+one colour out through the other nozzle; with two nozzles the tower only has to recover
+from ooze while a head sat idle, so `flush_multiplier` is 0.05 (~14 mm³) and purge material
+goes into infill where it can. If the first dual print shows stringing or colour carry-over
+on the object, raise it; if the tower is enormous, it went the wrong way.
+
+The prime tower is 60 mm wide at the front left (`wipe_tower_x/y` = −180 / −160). Keep
+that corner clear.
+
 ## File formats
 
 The Creator 4 accepts plain text G-code as well as `.gx`, so the container is optional —

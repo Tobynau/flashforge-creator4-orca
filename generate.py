@@ -297,6 +297,13 @@ def process(layer, tier, nozzle, machines):
 
         "enable_prime_tower": "1",
         "prime_tower_width": "60",
+        # Two separate nozzles: a tool change does not push one colour through
+        # the other, it only re-primes a nozzle that has been sitting. Orca's
+        # default would purge ~84 mm3 per change; this asks for ~14.
+        "flush_multiplier": "0.05",
+        "flush_into_infill": "1",
+        "flush_into_objects": "0",
+        "flush_into_support": "1",
         "prime_tower_brim_width": "3",
         "wipe_tower_x": ["-180", "-180"],
         "wipe_tower_y": ["-160", "-160"],
