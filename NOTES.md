@@ -19,10 +19,15 @@ Orca speaks Marlin; the Creator 4 speaks FlashForge. `gx_post.py` translates:
 | — | `M118 X.. Y.. Z.. T0` bounding box inserted |
 | `;layer_count:11` | `;layer_count: 11` |
 | `;layer:0.2` | `;layer:0.20` |
+| — | calPad block in duplicate/mirror files (below) |
 
 The last two are not cosmetic. FlashPrint writes a space after `layer_count:` and two
 decimals on every `;layer:` marker, and the firmware's parser wants both — without them
 the printer prints happily but shows no layer progress.
+
+`M118` is the print's reach from the bed centre — max |X|, max |Y|, max Z — not its
+width and depth; that is what FlashPrint writes (checked against a normal-mode file whose
+model ran from X −40 to +128 and got `M118 X128.33`).
 
 Then it builds the container: 58-byte header, 80 × 60 BMP preview at offset 58, 320 × 320
 PNG preview at 14512, G-code after that. Orca's own thumbnail becomes the PNG and is
@@ -136,8 +141,46 @@ duplication on this machine rather than anything measured. If FlashPrint shows y
 different plate size in duplicate mode, change `half_x` in `IDEX_MODES` and re-run
 `generate.py`.
 
-Untested on hardware: the G-code matches the reference file's structure, but nobody has
-run one of these prints yet.
+### The calPad block
+
+FlashPrint's duplicate and mirror files carry something normal-mode files do not: right
+after `;layer_count:` and before the mode command, four "calibration pads", every move
+commented out with `;:` so no slicer or preview shows them:
+
+```
+;calPad A start Z0.20
+;support-start
+;structure:cal-pad
+;:G1 X18.49 Y-29.02 F6000
+;:G1 X18.33 Y-25.83 E0.0977 F4800
+...
+;support-end
+;calPad A end
+;calPad B start Z0.20
+...
+;calPad SB end
+M109 T2
+```
+
+The firmware executes those lines itself. Each pad covers the first layer's footprint plus
+a margin: `A` and `B` are 30 % rasters (A's lines run along X, B's along Y), `SA` and `SB`
+the solid versions, all at F4800 with absolute E from zero and the same E-per-mm as a
+0.41 × layer-height line. A Creator 3 owner worked out what they are for: the two nozzles
+are never at exactly the same height, and in duplicate mode both print at the same Z, so
+the firmware lays a compensating raft under the copy printed by the higher nozzle and picks
+the pad to do it with. Simplify3D users on the Creator 3 found the other effect the hard
+way — with no calPad block, the firmware **does not place the two heads where it should**
+(their copies overlapped; on the Creator 4 the left head ran into its end stop on the first
+move and skipped). Pasting the block in fixed it.
+
+`gx_post.py` therefore generates one for every duplicate/mirror file, from the first
+layer's extrusion bounding box plus 3.2 mm, and inserts it in front of the mode command.
+It makes no attempt to reproduce FlashPrint's rounded outline; the firmware only needs the
+footprint and the four pad variants.
+
+Status, 2026-09-16: files without the block crashed the left head; files with it have not
+been printed yet. FlashPrint also prompts to add a raft in these modes — do that in the
+process preset if the first layer of one copy misbehaves.
 
 ## File formats
 

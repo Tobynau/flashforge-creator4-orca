@@ -10,6 +10,11 @@ file Orca just wrote:
      heater commands, absolute extruder addressing, no leading-dot numbers).
   2. Wraps the result in the binary .gx container FlashPrint produces:
      58-byte header + 80x60 24-bit BMP preview + the G-code.
+  3. In duplicate/mirror mode, adds the "calPad" block FlashPrint puts in
+     front of the mode command: four commented-out (`;:G1`) pads covering the
+     first layer's footprint. The firmware executes those itself - it is how
+     it levels the two nozzles against each other and spaces the heads. Files
+     without it put the heads in the wrong place (see NOTES.md).
 
 Everything here was derived from a working FlashPrint .gx file for this
 printer, so the emitted file should be byte-compatible with what the machine
@@ -40,8 +45,75 @@ MODES = {
     "mirror":    dict(command="M109 T1",  m118="T0 T1 D1", flag=47),
 }
 ACCEL = 1000.0                                     # mm/s^2, for the fallback estimate
+CALPAD_MARGIN = 3.2                                # mm past the first layer, as FlashPrint
+CALPAD_Z = 0.20                                    # FlashPrint's calPad.layerHeight
+CALPAD_DENSITY = 0.3                               # of the sparse pads (A, B)
 SHORT_MOVE = 0.75                                  # mm, below which moves chain together
 BMP_W, BMP_H = 80, 60
+
+
+def calpad_block(bbox, layer_height, nozzle):
+    """FlashPrint's calPad block for duplicate/mirror prints.
+
+    Four pads over the first layer's footprint plus a margin, every move
+    commented out with ";:" so slicers and previews ignore it and only the
+    firmware runs it: A and B are 30 % rasters (A along X, B along Y), SA and
+    SB the solid versions. Each is an outline followed by a zigzag fill,
+    absolute E from zero, F6000 travels and F4800 prints - the same shape,
+    density, speeds and E-per-mm as the reference file (width 0.41, print
+    layer height) so the firmware sees what it is used to."""
+    width = round(nozzle * 1.025, 2)
+    e_per_mm = width * layer_height / (math.pi * 0.875 ** 2)
+    x0, y0 = bbox[0] - CALPAD_MARGIN, bbox[1] - CALPAD_MARGIN
+    x1, y1 = bbox[2] + CALPAD_MARGIN, bbox[3] + CALPAD_MARGIN
+    out = []
+    for name, vertical, spacing in (("A", False, width / CALPAD_DENSITY),
+                                    ("B", True, width / CALPAD_DENSITY),
+                                    ("SA", False, width),
+                                    ("SB", True, width)):
+        out.append(";calPad %s start Z%.2f" % (name, CALPAD_Z))
+        out.append(";support-start")
+        if name == "A":
+            out.append(";structure:cal-pad")
+        e = 0.0
+        px, py = x0, y0
+        out.append(";:G1 X%.2f Y%.2f F6000" % (px, py))
+
+        def draw(x, y, feed=None):
+            nonlocal e, px, py
+            e += math.hypot(x - px, y - py) * e_per_mm
+            px, py = x, y
+            out.append(";:G1 X%.2f Y%.2f E%.4f%s" % (x, y, e, " F%d" % feed if feed else ""))
+
+        # outline
+        draw(x1, y0, 4800)
+        draw(x1, y1)
+        draw(x0, y1)
+        draw(x0, y0)
+        # zigzag fill, inset one line width from the outline
+        ax0, ay0, ax1, ay1 = x0 + width, y0 + width, x1 - width, y1 - width
+        if ax1 > ax0 and ay1 > ay0:
+            if vertical:
+                n = int((ax1 - ax0) / spacing) + 1
+                xs = [ax0 + i * spacing for i in range(n)]
+                px, py = xs[0], ay0
+                out.append(";:G1 X%.2f Y%.2f F6000" % (px, py))
+                for i, xx in enumerate(xs):
+                    if i:
+                        draw(xx, py)                       # step to the next line
+                    draw(xx, ay1 if i % 2 == 0 else ay0)   # the line itself
+            else:
+                n = int((ay1 - ay0) / spacing) + 1
+                ys = [ay0 + i * spacing for i in range(n)]
+                px, py = ax0, ys[0]
+                out.append(";:G1 X%.2f Y%.2f F6000" % (px, py))
+                for i, yy in enumerate(ys):
+                    if i:
+                        draw(px, yy)
+                    draw(ax1 if i % 2 == 0 else ax0, yy)
+        out.append(";support-end")
+        out.append(";calPad %s end" % name)
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -180,7 +252,7 @@ def parse_time(text):
     return total
 
 
-def convert(lines, max_z=None, total_layers=0):
+def convert(lines, max_z=None, total_layers=0, layer_height=0.2, nozzle=0.4):
     """Return (converted_lines, info dict)."""
     out = []
     tool = 0
@@ -202,6 +274,9 @@ def convert(lines, max_z=None, total_layers=0):
     tool_selected = False
     layer_count_at = None
     first_layer_at = None
+    mode_cmd_at = None
+    layer_no = -1
+    fl = [1e9, 1e9, -1e9, -1e9]                    # first layer's extrusion bbox
 
     for raw in lines:
         line = raw.rstrip("\r\n")
@@ -224,6 +299,7 @@ def convert(lines, max_z=None, total_layers=0):
             m = re.match(r";layer:\s*([\d.]+)\s*$", stripped)
             if m:
                 printing = True
+                layer_no += 1
                 if first_layer_at is None:
                     first_layer_at = len(out)
                 out.append(";layer:%.2f" % float(m.group(1)))
@@ -272,6 +348,7 @@ def convert(lines, max_z=None, total_layers=0):
                 if spec["command"] and t is not None and \
                         spec["command"] == "M109 T%d" % int(float(t)):
                     mode = name
+                    mode_cmd_at = len(out)
             out.append(line)
             continue
 
@@ -391,10 +468,25 @@ def convert(lines, max_z=None, total_layers=0):
                 minx, maxx = min(minx, x), max(maxx, x)
                 miny, maxy = min(miny, y), max(maxy, y)
                 maxz = max(maxz, z)
+                if layer_no == 0:
+                    fl = [min(fl[0], x), min(fl[1], y), max(fl[2], x), max(fl[3], y)]
             out.append(line)
             continue
 
         out.append(line)
+
+    # Duplicate and mirror files carry FlashPrint's calPad block between the
+    # layer count and the mode command; the firmware will not place the heads
+    # properly without it.
+    if mode != "normal" and mode_cmd_at is not None and fl[2] >= fl[0]:
+        pad = calpad_block(fl, layer_height, nozzle)
+        out[mode_cmd_at:mode_cmd_at] = pad
+        if first_layer_at is not None and first_layer_at >= mode_cmd_at:
+            first_layer_at += len(pad)
+        if layer_count_at is not None and layer_count_at >= mode_cmd_at:
+            layer_count_at += len(pad)
+        if m118_at is not None and m118_at >= mode_cmd_at:
+            m118_at += len(pad)
 
     if maxx < minx:
         minx = miny = maxx = maxy = 0.0
@@ -403,6 +495,9 @@ def convert(lines, max_z=None, total_layers=0):
     info = {
         "mode": mode,
         "size": (maxx - minx, maxy - miny, maxz),
+        # what FlashPrint puts on M118: how far the print reaches from the
+        # bed centre, not how wide it is
+        "extent": (max(abs(minx), abs(maxx)), max(abs(miny), abs(maxy)), maxz),
         "temps": temps,
         "bed_temp": bed_temp,
         "seconds": seconds,
@@ -423,10 +518,11 @@ def convert(lines, max_z=None, total_layers=0):
         if m118_at is not None:
             m118_at += 1
 
-    # FlashPrint announces the model's bounding box before it heats up
+    # FlashPrint announces the model's reach (max |X|, max |Y|, max Z) before
+    # it heats up
     if m118_at is not None:
         out.insert(m118_at, "M118 X%.2f Y%.2f Z%.2f %s"
-                   % (info["size"][0], info["size"][1], info["size"][2],
+                   % (info["extent"][0], info["extent"][1], info["extent"][2],
                       MODES[mode]["m118"]))
     return out, info
 
@@ -460,6 +556,7 @@ def scrape(text):
         "seconds": seconds,
         "used": used,
         "layer_height": find(r"^; layer_height = ([\d.]+)", 0.2, float),
+        "nozzle": find(r"^; nozzle_diameter = ([\d.]+)", 0.4, float),
         "shells": find(r"^; wall_loops = (\d+)", 3, int),
         "speed": find(r"^; inner_wall_speed = ([\d.]+)", 60, float),
         "layers": find(r"^; total layer number: (\d+)", 0, int),
@@ -612,7 +709,8 @@ def main(argv):
     text = blob.decode("utf-8", "replace")
     thumb, png = extract_thumbnail(text)
     meta = scrape(text)
-    lines, info = convert(text.splitlines(), meta["max_z"], meta["layers"])
+    lines, info = convert(text.splitlines(), meta["max_z"], meta["layers"],
+                          meta["layer_height"], meta["nozzle"])
     meta["bed_temp"] = info["bed_temp"]
     meta["flag"] = MODES[info["mode"]]["flag"]
     configured = [int(float(v)) for v in meta["nozzle_temps"].split(",") if v.strip()]

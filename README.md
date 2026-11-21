@@ -38,7 +38,8 @@ python3 gx_post.py --dump yourfile.gx     # the G-code back out
 
 Duplicate and mirror printing have their own presets — `… 0.4 nozzle DUPLICATE` and
 `… MIRROR` — with the build area narrowed to one copy's worth and both nozzles driven from
-one toolpath.
+one toolpath. The post-processor adds the "calPad" block the firmware needs to position the
+two heads in these modes (see NOTES.md); a raft is recommended, as FlashPrint suggests.
 
 The printer takes plain G-code too — `gx_post.py --plain` skips the container, at the cost
 of the preview, time and layer count on the printer's screen.
